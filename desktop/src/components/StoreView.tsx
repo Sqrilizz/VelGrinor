@@ -513,6 +513,7 @@ export function StoreView() {
                     className="btn-icon btn-install"
                     onClick={() => handleOgulniegaInstall(pack)}
                     disabled={quickInstalling === key}
+                    aria-label={t("Install as a new profile")}
                     title={t("Install as a new profile")}
                   >
                     {quickInstalling === key ? "…" : "+"}
