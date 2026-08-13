@@ -10,12 +10,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const output = resolve(here, "../../web/public/screenshots");
 const baseUrl = process.env.VELGRINOR_SCREENSHOT_URL || "http://127.0.0.1:1420";
 const run = promisify(execFile);
-const icon = (label, color) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" rx="22" fill="${color}"/><text x="48" y="59" text-anchor="middle" fill="white" font-family="Arial" font-size="34" font-weight="700">${label}</text></svg>`)}`;
 const projects = [
-  { id: "sodium", slug: "sodium", name: "Sodium", description: "The fastest and most compatible rendering optimization mod.", icon_url: icon("S", "#00a331"), platform: "modrinth", content_type: "mod", downloads: 184200000, updated: "2026-08-01", categories: ["optimization"], game_versions: ["1.21.1"], loaders: ["fabric"] },
-  { id: "iris", slug: "iris", name: "Iris Shaders", description: "Modern shader support with excellent performance and compatibility.", icon_url: icon("I", "#007103"), platform: "modrinth", content_type: "mod", downloads: 112800000, updated: "2026-08-02", categories: ["visual"], game_versions: ["1.21.1"], loaders: ["fabric"] },
-  { id: "fabric-api", slug: "fabric-api", name: "Fabric API", description: "Essential hooks and interoperability for Fabric mods.", icon_url: icon("F", "#004d00"), platform: "modrinth", content_type: "mod", downloads: 203400000, updated: "2026-08-03", categories: ["library"], game_versions: ["1.21.1"], loaders: ["fabric"] },
-  { id: "lithium", slug: "lithium", name: "Lithium", description: "General-purpose optimization without changing vanilla behavior.", icon_url: icon("L", "#003716"), platform: "modrinth", content_type: "mod", downloads: 97800000, updated: "2026-08-04", categories: ["optimization"], game_versions: ["1.21.1"], loaders: ["fabric"] },
+  { id: "AANobbMI", slug: "sodium", name: "Sodium", description: "The fastest and most compatible rendering optimization mod.", icon_url: "https://cdn.modrinth.com/data/AANobbMI/295862f4724dc3f78df3447ad6072b2dcd3ef0c9_96.webp", platform: "modrinth", content_type: "mod", downloads: 206077523, updated: "2026-08-07", categories: ["optimization"], game_versions: ["1.21.1"], loaders: ["fabric"] },
+  { id: "YL57xq9U", slug: "iris", name: "Iris Shaders", description: "Modern shader support with excellent performance and compatibility.", icon_url: "https://cdn.modrinth.com/data/YL57xq9U/18d0e7f076d3d6ed5bedd472b853909aac5da202_96.webp", platform: "modrinth", content_type: "mod", downloads: 160378360, updated: "2026-08-03", categories: ["visual"], game_versions: ["1.21.1"], loaders: ["fabric"] },
+  { id: "P7dR8mSH", slug: "fabric-api", name: "Fabric API", description: "Essential hooks and interoperability for Fabric mods.", icon_url: "https://cdn.modrinth.com/data/P7dR8mSH/icon.png", platform: "modrinth", content_type: "mod", downloads: 203400000, updated: "2026-08-03", categories: ["library"], game_versions: ["1.21.1"], loaders: ["fabric"] },
+  { id: "gvQqBUqZ", slug: "lithium", name: "Lithium", description: "General-purpose optimization without changing vanilla behavior.", icon_url: "https://cdn.modrinth.com/data/gvQqBUqZ/bcc8686c13af0143adf4285d741256af824f70b7_96.webp", platform: "modrinth", content_type: "mod", downloads: 97800000, updated: "2026-08-04", categories: ["optimization"], game_versions: ["1.21.1"], loaders: ["fabric"] },
 ];
 const versions = ["0.6.13", "1.8.8", "0.116.1+1.21.1", "0.15.0"];
 const refs = projects.map((project, index) => ({ name: project.name, hash: `hash-${index}`, version: versions[index], source: `https://cdn.modrinth.com/data/${project.id}/versions/demo/${project.id}.jar`, file_name: `${project.id}.jar`, platform: "modrinth", project_id: project.id, version_id: `version-${index}`, enabled: true, pinned: index === 0 }));
@@ -88,6 +87,7 @@ await page.addInitScript(({ profile, projects, library, tags }) => {
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: profile.id }).waitFor();
 const capture = async (name) => {
+  await page.waitForFunction(() => [...document.images].every((image) => image.complete && image.naturalWidth > 0));
   const png = resolve(temporary, `${name}.png`);
   const webp = resolve(output, `${name}.webp`);
   await page.screenshot({ path: png, animations: "disabled" });
