@@ -316,8 +316,8 @@ const styles = `
 
   .launcher-body {
     position: relative;
-    /* Screenshot dimensions: actual captured size at 1x = 993x656 (1986x1312 at 2x retina) */
-    aspect-ratio: 993 / 656;
+    /* Screenshot dimensions: 1280x760 at 1x and 2560x1520 at 2x */
+    aspect-ratio: 1280 / 760;
     background: rgb(18 17 16);
   }
 

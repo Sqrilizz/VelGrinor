@@ -480,7 +480,7 @@ export function StoreView() {
                   {project.description}
                 </p>
                 <div className="content-item-meta" style={{ marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDownloads(project.downloads)}{t("downloads")}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{formatDownloads(project.downloads)} {t("downloads")}</span>
                   <button
                     className="content-meta-platform content-meta-platform-link"
                     style={{

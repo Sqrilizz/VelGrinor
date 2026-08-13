@@ -468,7 +468,7 @@ export function LibraryView() {
       {/* Stats */}
       {stats && (
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 20 }}>
-          {stats.total_items}{t("items ·")} {formatFileSize(stats.total_size)}{t("total")}
+          {stats.total_items} {t("items ·")} {formatFileSize(stats.total_size)} {t("total")}
         </p>
       )}
 
