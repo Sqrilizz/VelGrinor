@@ -103,6 +103,8 @@ pub fn run() {
             // Config commands
             commands::get_config_cmd,
             commands::save_config_cmd,
+            commands::get_curseforge_api_key_status_cmd,
+            commands::set_curseforge_api_key_cmd,
             // Template commands
             commands::list_templates_cmd,
             commands::load_template_cmd,

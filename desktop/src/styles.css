@@ -3768,6 +3768,26 @@ a {
   margin-top: 2px;
 }
 
+.settings-secret-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.settings-secret-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .settings-secret-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Custom checkbox */
 .checkbox-label {
   display: flex;

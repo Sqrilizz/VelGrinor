@@ -188,6 +188,12 @@ fn resolve_credentials(
     Ok((id, secret))
 }
 
+fn redact_config_secrets(mut config: Config) -> Config {
+    config.msa_client_secret = None;
+    config.curseforge_api_key = None;
+    config
+}
+
 #[tauri::command]
 pub fn list_profiles_cmd() -> Result<Vec<String>, String> {
     let paths = load_paths()?;
@@ -556,7 +562,9 @@ pub async fn refresh_account_session_cmd(id: String) -> Result<Account, String> 
 #[tauri::command]
 pub fn get_config_cmd() -> Result<Config, String> {
     let paths = load_paths()?;
-    load_config(&paths).map_err(|e| e.to_string())
+    load_config(&paths)
+        .map(redact_config_secrets)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -569,7 +577,28 @@ pub fn save_config_cmd(
     config.msa_client_id = client_id.filter(|v| !v.trim().is_empty());
     config.msa_client_secret = client_secret.filter(|v| !v.trim().is_empty());
     save_config(&paths, &config).map_err(|e| e.to_string())?;
-    Ok(config)
+    Ok(redact_config_secrets(config))
+}
+
+#[tauri::command]
+pub fn get_curseforge_api_key_status_cmd() -> Result<bool, String> {
+    let paths = load_paths()?;
+    let config = load_config(&paths).map_err(|e| e.to_string())?;
+    Ok(config
+        .curseforge_api_key
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty()))
+}
+
+#[tauri::command]
+pub fn set_curseforge_api_key_cmd(api_key: Option<String>) -> Result<bool, String> {
+    let paths = load_paths()?;
+    let mut config = load_config(&paths).map_err(|e| e.to_string())?;
+    config.curseforge_api_key = api_key
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    save_config(&paths, &config).map_err(|e| e.to_string())?;
+    get_curseforge_api_key_status_cmd()
 }
 
 #[tauri::command]
@@ -582,7 +611,7 @@ pub fn set_discord_rpc_enabled_cmd(
     config.discord_rpc_enabled = enabled;
     save_config(&paths, &config).map_err(|e| e.to_string())?;
     rpc.configure(enabled, config.discord_app_id.clone());
-    Ok(config)
+    Ok(redact_config_secrets(config))
 }
 
 #[tauri::command]
@@ -2863,7 +2892,7 @@ pub fn set_auto_update_enabled_cmd(enabled: bool) -> Result<Config, String> {
     let mut config = load_config(&paths).map_err(|e| e.to_string())?;
     config.auto_update_enabled = enabled;
     save_config(&paths, &config).map_err(|e| e.to_string())?;
-    Ok(config)
+    Ok(redact_config_secrets(config))
 }
 
 // ============================================================================
@@ -2972,4 +3001,25 @@ pub fn save_profile_organization_cmd(organization: ProfileOrganization) -> Resul
     velgrinor::util::atomic_write(&paths.profile_organization, data)
         .map_err(|e| format!("Failed to write profile organization: {}", e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_responses_do_not_expose_secrets() {
+        let config = Config {
+            msa_client_id: Some("public-client-id".to_string()),
+            msa_client_secret: Some("microsoft-secret".to_string()),
+            curseforge_api_key: Some("curseforge-secret".to_string()),
+            ..Config::default()
+        };
+
+        let redacted = redact_config_secrets(config);
+
+        assert_eq!(redacted.msa_client_id.as_deref(), Some("public-client-id"));
+        assert!(redacted.msa_client_secret.is_none());
+        assert!(redacted.curseforge_api_key.is_none());
+    }
 }

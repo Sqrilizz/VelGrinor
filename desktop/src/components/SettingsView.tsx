@@ -26,6 +26,9 @@ export function SettingsView() {
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [discordRpc, setDiscordRpc] = useState(config?.discord_rpc_enabled ?? true);
+  const [curseForgeApiKey, setCurseForgeApiKey] = useState("");
+  const [curseForgeConfigured, setCurseForgeConfigured] = useState(false);
+  const [savingCurseForgeKey, setSavingCurseForgeKey] = useState(false);
   const [loading, setLoading] = useState(true);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
@@ -63,6 +66,16 @@ export function SettingsView() {
     }
   }, []);
 
+  const loadCurseForgeStatus = useCallback(async () => {
+    try {
+      const configured = await invoke<boolean>("get_curseforge_api_key_status_cmd");
+      setCurseForgeConfigured(configured);
+    } catch (err) {
+      setCurseForgeConfigured(false);
+      notify(t("Failed to load CurseForge status"), String(err));
+    }
+  }, [notify]);
+
   const loadJavaInstallations = useCallback(async () => {
     setDetectingJava(true);
     try {
@@ -77,11 +90,11 @@ export function SettingsView() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([loadStats(), loadAutoUpdate()]);
+      await Promise.all([loadStats(), loadAutoUpdate(), loadCurseForgeStatus()]);
       setLoading(false);
     };
     load();
-  }, [loadStats, loadAutoUpdate]);
+  }, [loadStats, loadAutoUpdate, loadCurseForgeStatus]);
 
   useEffect(() => {
     getVersion()
@@ -127,6 +140,39 @@ export function SettingsView() {
       notify(t("Settings saved"), `Discord Rich Presence ${enabled ? "enabled" : "disabled"}`);
     } catch (err) {
       notify(t("Failed to save settings"), String(err));
+    }
+  };
+
+  const handleSaveCurseForgeKey = async () => {
+    const apiKey = curseForgeApiKey.trim();
+    if (!apiKey) {
+      notify(t("API key is required"));
+      return;
+    }
+    setSavingCurseForgeKey(true);
+    try {
+      const configured = await invoke<boolean>("set_curseforge_api_key_cmd", { apiKey });
+      setCurseForgeConfigured(configured);
+      setCurseForgeApiKey("");
+      notify(t("CurseForge API key saved"));
+    } catch (err) {
+      notify(t("Failed to save CurseForge API key"), String(err));
+    } finally {
+      setSavingCurseForgeKey(false);
+    }
+  };
+
+  const handleRemoveCurseForgeKey = async () => {
+    setSavingCurseForgeKey(true);
+    try {
+      const configured = await invoke<boolean>("set_curseforge_api_key_cmd", { apiKey: null });
+      setCurseForgeConfigured(configured);
+      setCurseForgeApiKey("");
+      notify(t("Custom CurseForge API key removed"));
+    } catch (err) {
+      notify(t("Failed to remove CurseForge API key"), String(err));
+    } finally {
+      setSavingCurseForgeKey(false);
     }
   };
 
@@ -387,6 +433,53 @@ export function SettingsView() {
                 >
                   <span className="toggle-switch-thumb" />
                 </button>
+              </div>
+            </section>
+
+            <section className="settings-card" style={{ marginBottom: 24 }}>
+              <div className="settings-card-header">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ opacity: 0.6 }}>
+                  <path d="M4 10a6 6 0 1112 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5z" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M7 10V8a3 3 0 016 0v2M10 13v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span>{t("Content providers")}</span>
+                <span className={`badge ${curseForgeConfigured ? "badge-success" : "badge-muted"}`} style={{ marginLeft: "auto" }}>
+                  {curseForgeConfigured ? t("Configured") : t("Not configured")}
+                </span>
+              </div>
+
+              <div className="settings-secret-control">
+                <div>
+                  <div className="settings-row-title">{t("CurseForge API key")}</div>
+                  <div className="settings-row-description">{t("Required for CurseForge search, installs, and modpacks. Stored securely and never shown again.")}</div>
+                </div>
+                <form
+                  className="settings-secret-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleSaveCurseForgeKey();
+                  }}
+                >
+                  <input
+                    className="input"
+                    type="password"
+                    value={curseForgeApiKey}
+                    onChange={(event) => setCurseForgeApiKey(event.target.value)}
+                    placeholder={t("Enter API key")}
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={savingCurseForgeKey}
+                    aria-label={t("CurseForge API key")}
+                  />
+                  <button className="btn btn-primary btn-sm" type="submit" disabled={savingCurseForgeKey || !curseForgeApiKey.trim()}>
+                    {savingCurseForgeKey ? t("Saving...") : t("Save key")}
+                  </button>
+                  {curseForgeConfigured && (
+                    <button className="btn btn-secondary btn-sm" type="button" onClick={() => void handleRemoveCurseForgeKey()} disabled={savingCurseForgeKey}>
+                      {t("Remove custom key")}
+                    </button>
+                  )}
+                </form>
               </div>
             </section>
 
