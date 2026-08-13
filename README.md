@@ -110,7 +110,7 @@ velgrinor --help
 
 ## External services
 
-Microsoft sign-in needs an OAuth client ID. Set it in **Settings → Accounts** or provide `VELGRINOR_MS_CLIENT_ID`. Offline accounts work without Microsoft authentication.
+Microsoft sign-in needs a sign in by mail and password (like other launchers). Offline accounts work without Microsoft authentication.
 
 CurseForge browsing needs an API key, which can be entered in Settings or supplied as `VELGRINOR_CURSEFORGE_API_KEY`. Modrinth integration does not require a key.
 
