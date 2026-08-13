@@ -1,0 +1,656 @@
+name: Store publish
+# Publishes to AUR, Homebrew, Scoop, Flathub, and Winget when a release is published
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.1.6)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${{ secrets.AUR_SSH_PRIVATE_KEY }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect release info
+        if: steps.check.outputs.skip != 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download checksums
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          curl -fsSL "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/SHA256SUMS.txt" -o SHA256SUMS.txt
+
+      - name: Prepare velgrinor PKGBUILD
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}"
+          CLI_SHA=$(grep "velgrinor-cli-linux-x64.tar.gz" SHA256SUMS.txt | cut -d' ' -f1)
+          if ! printf '%s' "$CLI_SHA" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Missing or invalid velgrinor-cli-linux-x64.tar.gz hash in SHA256SUMS.txt" >&2
+            exit 1
+          fi
+
+          mkdir -p velgrinor
+          cat > velgrinor/PKGBUILD << 'PKGEOF'
+          # Maintainer: Sqrilizz <Sqrilizz@users.noreply.github.com>
+          pkgname=velgrinor
+          pkgver=PKGVER_PLACEHOLDER
+          pkgrel=1
+          pkgdesc="A minimal, content-addressed Minecraft launcher (CLI)"
+          arch=('x86_64')
+          url="https://github.com/Sqrilizz/VelGrinor"
+          license=('MIT')
+          depends=('gcc-libs')
+          source=("https://github.com/Sqrilizz/VelGrinor/releases/download/v${pkgver}/velgrinor-cli-linux-x64.tar.gz")
+          sha256sums=('SHA256_PLACEHOLDER')
+
+          package() {
+              install -Dm755 velgrinor "${pkgdir}/usr/bin/velgrinor"
+          }
+          PKGEOF
+          sed -i "s/PKGVER_PLACEHOLDER/${VERSION}/" velgrinor/PKGBUILD
+          sed -i "s/SHA256_PLACEHOLDER/${CLI_SHA}/" velgrinor/PKGBUILD
+
+      - name: Prepare velgrinor-launcher-bin PKGBUILD
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}"
+          DESKTOP_SHA=$(grep "velgrinor-launcher-linux-x64.deb" SHA256SUMS.txt | cut -d' ' -f1)
+          if ! printf '%s' "$DESKTOP_SHA" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Missing or invalid velgrinor-launcher-linux-x64.deb hash in SHA256SUMS.txt" >&2
+            exit 1
+          fi
+
+          mkdir -p velgrinor-launcher-bin
+          cat > velgrinor-launcher-bin/PKGBUILD << 'PKGEOF'
+          # Maintainer: Sqrilizz <Sqrilizz@users.noreply.github.com>
+          pkgname=velgrinor-launcher-bin
+          pkgver=PKGVER_PLACEHOLDER
+          pkgrel=1
+          pkgdesc="A minimal, content-addressed Minecraft launcher (Desktop App)"
+          arch=('x86_64')
+          url="https://github.com/Sqrilizz/VelGrinor"
+          license=('MIT')
+          depends=('webkit2gtk-4.1' 'libappindicator-gtk3')
+          provides=('velgrinor-launcher')
+          conflicts=('velgrinor-launcher')
+          source=("https://github.com/Sqrilizz/VelGrinor/releases/download/v${pkgver}/velgrinor-launcher-linux-x64.deb")
+          sha256sums=('SHA256_PLACEHOLDER')
+
+          package() {
+              bsdtar -xf data.tar.* -C "${pkgdir}/"
+          }
+          PKGEOF
+          sed -i "s/PKGVER_PLACEHOLDER/${VERSION}/" velgrinor-launcher-bin/PKGBUILD
+          sed -i "s/SHA256_PLACEHOLDER/${DESKTOP_SHA}/" velgrinor-launcher-bin/PKGBUILD
+
+      - name: Publish velgrinor to AUR
+        if: steps.check.outputs.skip != 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: velgrinor
+          pkgbuild: velgrinor/PKGBUILD
+          commit_username: 'Sqrilizz'
+          commit_email: 'Sqrilizz@users.noreply.github.com'
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ steps.release.outputs.tag }}"
+
+      - name: Publish velgrinor-launcher-bin to AUR
+        if: steps.check.outputs.skip != 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: velgrinor-launcher-bin
+          pkgbuild: velgrinor-launcher-bin/PKGBUILD
+          commit_username: 'Sqrilizz'
+          commit_email: 'Sqrilizz@users.noreply.github.com'
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ steps.release.outputs.tag }}"
+
+  homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${{ secrets.PACKAGE_REPOS_TOKEN }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect release info
+        if: steps.check.outputs.skip != 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch SHA256SUMS
+        if: steps.check.outputs.skip != 'true'
+        id: hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          curl -fsSL "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/SHA256SUMS.txt" -o /tmp/SHA256SUMS.txt
+
+          # CLI hashes
+          CLI_MACOS_ARM64=$(grep 'velgrinor-cli-macos-arm64.tar.gz$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+          CLI_MACOS_X64=$(grep 'velgrinor-cli-macos-x64.tar.gz$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+          CLI_LINUX_X64=$(grep 'velgrinor-cli-linux-x64.tar.gz$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+
+          # Desktop hashes (DMG)
+          DESKTOP_MACOS_ARM64=$(grep 'velgrinor-launcher-macos-arm64.dmg$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+          DESKTOP_MACOS_X64=$(grep 'velgrinor-launcher-macos-x64.dmg$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+
+          for hash in "$CLI_MACOS_ARM64" "$CLI_MACOS_X64" "$CLI_LINUX_X64" "$DESKTOP_MACOS_ARM64" "$DESKTOP_MACOS_X64"; do
+            if ! printf '%s' "$hash" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+              echo "Missing or invalid release hash" >&2
+              exit 1
+            fi
+          done
+
+          echo "cli_macos_arm64=${CLI_MACOS_ARM64}" >> "$GITHUB_OUTPUT"
+          echo "cli_macos_x64=${CLI_MACOS_X64}" >> "$GITHUB_OUTPUT"
+          echo "cli_linux_x64=${CLI_LINUX_X64}" >> "$GITHUB_OUTPUT"
+          echo "desktop_macos_arm64=${DESKTOP_MACOS_ARM64}" >> "$GITHUB_OUTPUT"
+          echo "desktop_macos_x64=${DESKTOP_MACOS_X64}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew tap
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOS_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/Sqrilizz/homebrew-velgrinor.git" homebrew-tap
+          cd homebrew-tap
+
+          # Update Formula/velgrinor.rb
+          cat > Formula/velgrinor.rb << EOF
+          class VelGrinor < Formula
+            desc "A minimal, content-addressed Minecraft launcher"
+            homepage "https://github.com/Sqrilizz/VelGrinor"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-cli-macos-arm64.tar.gz"
+                sha256 "${{ steps.hashes.outputs.cli_macos_arm64 }}"
+              else
+                url "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-cli-macos-x64.tar.gz"
+                sha256 "${{ steps.hashes.outputs.cli_macos_x64 }}"
+              end
+            end
+
+            on_linux do
+              url "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-cli-linux-x64.tar.gz"
+              sha256 "${{ steps.hashes.outputs.cli_linux_x64 }}"
+            end
+
+            def install
+              bin.install "velgrinor"
+            end
+
+            test do
+              assert_match "velgrinor", shell_output("#{bin}/velgrinor --version")
+            end
+          end
+          EOF
+
+          # Update Casks/velgrinor-launcher.rb
+          cat > Casks/velgrinor-launcher.rb << EOF
+          cask "velgrinor-launcher" do
+            version "${VERSION}"
+
+            on_arm do
+              url "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-launcher-macos-arm64.dmg"
+              sha256 "${{ steps.hashes.outputs.desktop_macos_arm64 }}"
+            end
+
+            on_intel do
+              url "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-launcher-macos-x64.dmg"
+              sha256 "${{ steps.hashes.outputs.desktop_macos_x64 }}"
+            end
+
+            name "VelGrinor Launcher"
+            desc "A minimal, content-addressed Minecraft launcher"
+            homepage "https://github.com/Sqrilizz/VelGrinor"
+
+            app "VelGrinor Launcher.app"
+
+            zap trash: [
+              "~/.velgrinor",
+              "~/Library/Application Support/md.thomas.velgrinor-launcher",
+              "~/Library/Caches/md.thomas.velgrinor-launcher",
+              "~/Library/Preferences/md.thomas.velgrinor-launcher.plist",
+            ]
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+          end
+          EOF
+
+          git add Formula/velgrinor.rb Casks/velgrinor-launcher.rb
+          git -c user.name="github-actions" -c user.email="github-actions@github.com" commit -m "Update to ${VERSION}" || echo "No changes to commit"
+          git push
+
+  scoop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${{ secrets.PACKAGE_REPOS_TOKEN }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect release info
+        if: steps.check.outputs.skip != 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch SHA256SUMS
+        if: steps.check.outputs.skip != 'true'
+        id: hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          curl -fsSL "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/SHA256SUMS.txt" -o /tmp/SHA256SUMS.txt
+          WINDOWS_ZIP_HASH=$(grep 'velgrinor-cli-windows-x64.zip$' /tmp/SHA256SUMS.txt | awk '{print $1}')
+          if ! printf '%s' "$WINDOWS_ZIP_HASH" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Missing or invalid velgrinor-cli-windows-x64.zip hash" >&2
+            exit 1
+          fi
+          echo "windows_zip=${WINDOWS_ZIP_HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Update Scoop bucket
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOS_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+          HASH="${{ steps.hashes.outputs.windows_zip }}"
+
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/Sqrilizz/scoop-velgrinor.git" scoop-bucket
+          cd scoop-bucket
+
+          # Update bucket/velgrinor.json
+          cat > bucket/velgrinor.json << EOF
+          {
+              "version": "${VERSION}",
+              "description": "A minimal, content-addressed Minecraft launcher (CLI)",
+              "homepage": "https://github.com/Sqrilizz/VelGrinor",
+              "license": "MIT",
+              "url": "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/velgrinor-cli-windows-x64.zip",
+              "hash": "${HASH}",
+              "bin": "velgrinor.exe",
+              "checkver": {
+                  "github": "https://github.com/Sqrilizz/VelGrinor"
+              },
+              "autoupdate": {
+                  "url": "https://github.com/Sqrilizz/VelGrinor/releases/download/v\$version/velgrinor-cli-windows-x64.zip"
+              }
+          }
+          EOF
+
+          git add bucket/velgrinor.json
+          git -c user.name="github-actions" -c user.email="github-actions@github.com" commit -m "Update to ${VERSION}" || echo "No changes to commit"
+          git push
+
+  flathub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${{ secrets.PACKAGE_REPOS_TOKEN }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout velgrinor repo
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Setup Node.js
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          pip install aiohttp toml tomlkit
+          # Install flatpak-node-generator (it's now a Python package, not a standalone script)
+          pip install "git+https://github.com/flatpak/flatpak-builder-tools.git#subdirectory=node"
+
+      - name: Collect release info
+        if: steps.check.outputs.skip != 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          if [ -n "${{ github.event.release.published_at }}" ]; then
+            DATE="${{ github.event.release.published_at }}"
+            DATE="${DATE%%T*}"
+          else
+            DATE="$(date -u +%Y-%m-%d)"
+          fi
+          # Get commit SHA for the tag
+          COMMIT_SHA=$(git rev-list -n 1 "${TAG}")
+          test -n "$COMMIT_SHA" || { echo "Unable to resolve release tag ${TAG}" >&2; exit 1; }
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "date=${DATE}" >> "$GITHUB_OUTPUT"
+          echo "commit=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Clone flatpak-builder-tools
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git /tmp/flatpak-builder-tools
+
+      - name: Generate cargo-sources.json
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          # Use root Cargo.lock which contains all workspace dependencies
+          # (including 'keyring' from the launcher crate)
+          python3 /tmp/flatpak-builder-tools/cargo/flatpak-cargo-generator.py \
+            Cargo.lock \
+            -o /tmp/cargo-sources.json
+
+      - name: Generate package-lock.json and node-sources.json
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          cd desktop
+          # Temporarily remove Playwright from package.json to prevent flatpak-node-generator
+          # from trying to download Playwright browser binaries (which fails in CI)
+          # We can't use --no-devel because it excludes build-time dependencies like Babel
+          jq 'del(.devDependencies["@playwright/test"])' package.json > package.json.tmp
+          mv package.json.tmp package.json
+          # Generate package-lock.json from package.json (npm format for flatpak-node-generator)
+          npm install --package-lock-only --ignore-scripts
+          # Generate node sources using the installed flatpak-node-generator package
+          flatpak-node-generator npm package-lock.json -o /tmp/node-sources.json
+
+      - name: Clone and update Flathub repo
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOS_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+          DATE="${{ steps.release.outputs.date }}"
+          COMMIT="${{ steps.release.outputs.commit }}"
+
+          git clone --branch md.thomas.velgrinor.launcher "https://x-access-token:${GH_TOKEN}@github.com/Sqrilizz/flathub.git" flathub-repo
+          cd flathub-repo
+
+          # Copy generated sources (these are JSON arrays of source entries)
+          cp /tmp/cargo-sources.json .
+          cp /tmp/node-sources.json .
+          # Copy package-lock.json for npm ci in the build
+          cp ../desktop/package-lock.json .
+
+          # Generate the build-from-source manifest
+          # Note: cargo-sources.json and node-sources.json contain arrays of source entries
+          # that flatpak-builder will process to download and extract dependencies
+          cat > md.thomas.velgrinor.launcher.yml << 'MANIFEST_EOF'
+          id: md.thomas.velgrinor.launcher
+          runtime: org.gnome.Platform
+          runtime-version: '48'
+          sdk: org.gnome.Sdk
+          sdk-extensions:
+            - org.freedesktop.Sdk.Extension.rust-stable
+            - org.freedesktop.Sdk.Extension.node20
+            - org.freedesktop.Sdk.Extension.openjdk21
+          command: velgrinor-launcher
+
+          finish-args:
+            - --socket=wayland
+            - --socket=fallback-x11
+            - --device=dri
+            - --share=ipc
+            - --share=network
+            - --persist=.velgrinor
+            - --env=FLATPAK=1
+            - --env=PATH=/app/jre/bin:/app/bin:/usr/bin
+
+          build-options:
+            append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+            env:
+              CARGO_HOME: /run/build/velgrinor-launcher/cargo
+              XDG_CACHE_HOME: /run/build/velgrinor-launcher/flatpak-node/cache
+              npm_config_cache: /run/build/velgrinor-launcher/flatpak-node/npm-cache
+              npm_config_nodedir: /usr/lib/sdk/node20
+              npm_config_offline: 'true'
+
+          modules:
+            # Install OpenJDK 21 for running Minecraft
+            - name: openjdk
+              buildsystem: simple
+              build-commands:
+                - /usr/lib/sdk/openjdk21/install.sh
+
+            - name: velgrinor-launcher
+              buildsystem: simple
+              build-options:
+                env:
+                  CARGO_NET_OFFLINE: 'true'
+              sources:
+                - type: git
+                  url: https://github.com/Sqrilizz/VelGrinor.git
+                  tag: TAG_PLACEHOLDER
+                  commit: COMMIT_PLACEHOLDER
+                # Cargo vendored sources (generated by flatpak-cargo-generator)
+                - cargo-sources.json
+                # Node vendored sources (generated by flatpak-node-generator)
+                - node-sources.json
+                # Cargo config to use vendored sources
+                - type: inline
+                  contents: |
+                    [source.crates-io]
+                    replace-with = "vendored-sources"
+                    [source.vendored-sources]
+                    directory = "cargo/vendor"
+                  dest: .cargo
+                  dest-filename: config.toml
+                # package-lock.json for npm ci
+                - type: file
+                  path: package-lock.json
+                  dest: desktop
+              build-commands:
+                # Remove @playwright/test from package.json - it's only needed for testing,
+                # not for the production build, and its browser binaries can't be vendored
+                - sed -i '/"@playwright\/test"/d' desktop/package.json
+                - sed -i '/"prebuild":/d' desktop/package.json
+                # Build frontend
+                - cd desktop && npm ci --offline --legacy-peer-deps
+                - cd desktop && npm run build
+                # Build Tauri/Rust backend
+                - cargo build --release --offline -p velgrinor-launcher
+                - install -Dm755 target/release/velgrinor-launcher /app/bin/velgrinor-launcher
+                # Install desktop file from upstream
+                - install -Dm644 packaging/flathub/md.thomas.velgrinor.launcher.desktop /app/share/applications/md.thomas.velgrinor.launcher.desktop
+                # Install icons
+                - install -Dm644 desktop/src-tauri/icons/icon.png /app/share/icons/hicolor/256x256/apps/md.thomas.velgrinor.launcher.png
+                - install -Dm644 desktop/src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/md.thomas.velgrinor.launcher.png
+                - install -Dm644 desktop/src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/md.thomas.velgrinor.launcher.png
+                # Install metainfo from upstream
+                - install -Dm644 packaging/flathub/md.thomas.velgrinor.launcher.metainfo.xml /app/share/metainfo/md.thomas.velgrinor.launcher.metainfo.xml
+          MANIFEST_EOF
+
+          # Replace placeholders in manifest
+          sed -i "s|TAG_PLACEHOLDER|${TAG}|g" md.thomas.velgrinor.launcher.yml
+          sed -i "s|COMMIT_PLACEHOLDER|${COMMIT}|g" md.thomas.velgrinor.launcher.yml
+
+          # Remove separate desktop and metainfo files from flathub repo (they're now installed from upstream)
+          rm -f md.thomas.velgrinor.launcher.desktop md.thomas.velgrinor.launcher.metainfo.xml
+
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@github.com" commit -m "Update VelGrinor to ${VERSION}" || echo "No changes to commit"
+          git push
+
+  winget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${{ secrets.PACKAGE_REPOS_TOKEN }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repo
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Collect release info
+        if: steps.check.outputs.skip != 'true'
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch SHA256SUMS
+        if: steps.check.outputs.skip != 'true'
+        id: hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          curl -fsSL "https://github.com/Sqrilizz/VelGrinor/releases/download/${TAG}/SHA256SUMS.txt" -o /tmp/SHA256SUMS.txt
+          MSI_HASH="$(grep 'velgrinor-launcher-windows-x64.msi$' /tmp/SHA256SUMS.txt | awk '{print $1}')"
+          if ! printf '%s' "$MSI_HASH" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Missing or invalid velgrinor-launcher-windows-x64.msi hash in SHA256SUMS.txt" >&2
+            exit 1
+          fi
+          echo "msi_hash=${MSI_HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Update winget manifests and open PR
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOS_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+          MSI_HASH="${{ steps.hashes.outputs.msi_hash }}"
+          WINGET_FORK="Sqrilizz/winget-pkgs"
+          WINGET_BASE="microsoft/winget-pkgs"
+
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${WINGET_FORK}.git" winget-pkgs
+          cd winget-pkgs
+
+          # Sync fork with upstream
+          git remote add upstream "https://github.com/${WINGET_BASE}.git"
+          git fetch upstream master
+          git checkout -B master upstream/master
+          git push origin master --force
+
+          BRANCH="velgrinorlauncher-${VERSION}"
+          git checkout -b "$BRANCH"
+
+          TARGET_DIR="manifests/t/Th0rgal/VelGrinorLauncher/${VERSION}"
+          mkdir -p "$TARGET_DIR"
+          cp "$GITHUB_WORKSPACE/packaging/winget/Th0rgal.VelGrinorLauncher.yaml" "$TARGET_DIR/Th0rgal.VelGrinorLauncher.yaml"
+
+          sed -i -E "s/^PackageVersion: .*/PackageVersion: ${VERSION}/" "$TARGET_DIR/Th0rgal.VelGrinorLauncher.yaml"
+          sed -i -E "s|/download/v[^/]+/|/download/${TAG}/|" "$TARGET_DIR/Th0rgal.VelGrinorLauncher.yaml"
+          sed -i "s/InstallerSha256: PLACEHOLDER_SHA256/InstallerSha256: ${MSI_HASH}/" "$TARGET_DIR/Th0rgal.VelGrinorLauncher.yaml"
+
+          git add "$TARGET_DIR"
+          git -c user.name="github-actions" -c user.email="github-actions@github.com" commit -m "Add VelGrinor ${VERSION}"
+          git push -u origin "$BRANCH" --force
+
+          # Check if PR already exists before trying to create
+          FORK_OWNER="${WINGET_FORK%%/*}"
+          # Note: gh pr list uses just branch name, not owner:branch format
+          EXISTING_PR=$(gh pr list --repo "$WINGET_BASE" --head "${FORK_OWNER}:$BRANCH" --json number,url --jq '.[0]' 2>/dev/null || true)
+          if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
+            PR_URL=$(echo "$EXISTING_PR" | jq -r '.url')
+            PR_NUM=$(echo "$EXISTING_PR" | jq -r '.number')
+            echo "PR #$PR_NUM already exists for this version: $PR_URL"
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "$WINGET_BASE" \
+            --head "${FORK_OWNER}:$BRANCH" \
+            --title "VelGrinor ${VERSION}" \
+            --body "Automated update for VelGrinor ${VERSION}." \
+            --base master

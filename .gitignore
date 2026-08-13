@@ -1,0 +1,35 @@
+chorus
+/target
+.claude/
+.codex/
+.cursor/
+.context/
+.env
+.fabric/
+logs/
+crash-reports/
+fabricloader.log
+
+# Desktop app
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/icons/.compiled-icon/
+
+# Website
+web/node_modules/
+web/.next/
+web/out/
+web/test-results/
+web/playwright-report/
+
+# Marketing
+marketing/
+
+# General
+.playwright-mcp
+*.log
+*.tsbuildinfo
+.DS_Store
+.vercel
+.env*.local

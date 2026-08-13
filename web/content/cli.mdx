@@ -1,0 +1,270 @@
+---
+title: CLI Reference
+description: Complete reference for the VelGrinor CLI
+---
+
+# CLI Reference
+
+VelGrinor includes a full-featured CLI for scripting and automation.
+
+## Installation
+
+The CLI is a separate binary from the desktop app. Both share the same data directory (`~/.velgrinor/`), so profiles, accounts, and mods are shared between them.
+
+### Build from source
+
+```bash
+cd launcher
+cargo build --release
+# Binary: target/release/velgrinor
+
+# Or install to ~/.cargo/bin/
+cargo install --path .
+```
+
+### Homebrew (coming soon)
+
+```bash
+brew install velgrinor-launcher
+```
+
+## Global Options
+
+```bash
+velgrinor <COMMAND>
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+## Commands
+
+### Profile Management
+
+```bash
+# List all profiles
+velgrinor list
+velgrinor profile list
+
+# Create a new profile
+velgrinor profile create "Profile Name" --mc 1.21.4
+velgrinor profile create "Modded" --mc 1.21.4 --loader fabric
+
+# Rename a profile
+velgrinor profile rename "Old Name" "New Name"
+
+# Delete a profile
+velgrinor profile delete "Profile Name"
+
+# Show profile details
+velgrinor profile show "Profile Name"
+
+# Clone a profile
+velgrinor profile clone "Source" "Destination"
+
+# Compare two profiles
+velgrinor profile diff "Profile A" "Profile B"
+```
+
+### Content Management
+
+```bash
+# Add mods to a profile
+velgrinor mod add "Profile" sodium
+velgrinor mod add "Profile" /path/to/mod.jar
+
+# Remove mods
+velgrinor mod remove "Profile" sodium
+
+# List mods in a profile
+velgrinor mod list "Profile"
+
+# Resource packs and shader packs
+velgrinor resourcepack add "Profile" /path/to/pack.zip
+velgrinor shaderpack add "Profile" /path/to/shader.zip
+```
+
+### Account Management
+
+```bash
+# Add a Microsoft account (device code flow)
+velgrinor account add
+
+# List accounts
+velgrinor account list
+
+# Set active account
+velgrinor account use <username>
+
+# Remove an account
+velgrinor account remove <username>
+
+# Show account info
+velgrinor account info
+
+# Skin management
+velgrinor account skin upload /path/to/skin.png
+velgrinor account skin set-model slim
+
+# Cape management
+velgrinor account cape list
+velgrinor account cape select <cape-id>
+```
+
+### Store Operations
+
+```bash
+# Search for content
+velgrinor store search sodium
+velgrinor store search sodium --platform modrinth
+velgrinor store search jei --platform curseforge
+
+# Get project info
+velgrinor store info <platform> <project-id>
+
+# List project versions
+velgrinor store versions <platform> <project-id>
+
+# Install content to a profile
+velgrinor store install "Profile" <platform> <project-id>
+```
+
+### Library Management
+
+```bash
+# List library items
+velgrinor library list
+velgrinor library list --type mods
+
+# Show item details
+velgrinor library show <hash>
+
+# Import content
+velgrinor library import /path/to/file.jar
+
+# Remove from library
+velgrinor library remove <hash>
+
+# Update metadata
+velgrinor library update <hash>
+
+# Show statistics
+velgrinor library stats
+
+# Sync with content store
+velgrinor library sync
+
+# Tag management
+velgrinor library tag add <hash> <tag>
+velgrinor library tag remove <hash> <tag>
+```
+
+### Launch
+
+```bash
+# Launch a profile
+velgrinor launch "Profile Name"
+
+# Launch with specific account
+velgrinor launch "Profile Name" --account <username>
+
+# Prepare without launching
+velgrinor launch "Profile Name" --prepare-only
+```
+
+### Configuration
+
+```bash
+# Show current config
+velgrinor config show
+
+# Set Microsoft OAuth credentials
+velgrinor config set-client-id <client-id>
+velgrinor config set-client-secret <client-secret>
+
+# Set CurseForge API key
+velgrinor config set-curseforge-key <api-key>
+```
+
+### App Updates
+
+```bash
+# Check the desktop app update manifest
+velgrinor app-update check
+
+# Compare against a specific version (useful for testing updates)
+velgrinor app-update check --current 0.1.5
+
+# Override the manifest endpoint or platform
+velgrinor app-update check --endpoint https://github.com/Sqrilizz/VelGrinor/releases/latest/download/latest.json
+velgrinor app-update check --platform darwin-aarch64
+```
+
+### Logs
+
+```bash
+# View logs
+velgrinor logs
+```
+
+### Templates
+
+```bash
+# Template management
+velgrinor template list
+velgrinor template create <name>
+velgrinor template apply <profile> <template>
+```
+
+### Modpacks
+
+```bash
+# Modpack management
+velgrinor modpack import /path/to/modpack.mrpack
+velgrinor modpack export "Profile" /path/to/output.mrpack
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `VELGRINOR_MS_CLIENT_ID` | Microsoft OAuth client ID |
+| `VELGRINOR_MS_CLIENT_SECRET` | Microsoft OAuth client secret (if required) |
+| `VELGRINOR_CURSEFORGE_API_KEY` | CurseForge API key |
+| `RUST_LOG` | Logging level (error, warn, info, debug, trace) |
+
+## Examples
+
+### Create a modded profile
+
+```bash
+# Create profile
+velgrinor profile create "Modded 1.21" --mc 1.21.4 --loader fabric
+
+# Add performance mods
+velgrinor mod add "Modded 1.21" sodium
+
+# Launch
+velgrinor launch "Modded 1.21"
+```
+
+### Batch operations
+
+```bash
+# Add mods to multiple profiles
+for profile in "Profile A" "Profile B" "Profile C"; do
+  velgrinor mod add "$profile" sodium
+done
+```
+
+### Scripted backup
+
+```bash
+#!/bin/bash
+# Backup all profiles
+mkdir -p ~/velgrinor-backup
+cp -r ~/.velgrinor/profiles ~/velgrinor-backup/
+cp ~/.velgrinor/accounts.json ~/velgrinor-backup/
+echo "Backup complete!"
+```

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>md.thomas.velgrinor.launcher</id>
+  <name>VelGrinor Launcher</name>
+  <summary>A minimal, modern Minecraft launcher</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="tech.sqrilizz">
+    <name>Sqrilizz</name>
+  </developer>
+  <description>
+    <p>
+      VelGrinor Launcher is a modern, minimal Minecraft launcher with a clean interface
+      focused on stability and ease of use.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Intuitive profile management with drag-and-drop organization</li>
+      <li>Built-in mod browser for Modrinth and CurseForge</li>
+      <li>3D skin viewer with cape support</li>
+      <li>Support for Fabric, Forge, Quilt, and NeoForge</li>
+      <li>Smart storage that automatically deduplicates mods across profiles</li>
+      <li>Multiple Microsoft account support with easy switching</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">md.thomas.velgrinor.launcher.desktop</launchable>
+  <url type="homepage">https://github.com/Sqrilizz/VelGrinor</url>
+  <url type="bugtracker">https://github.com/Sqrilizz/VelGrinor/issues</url>
+  <url type="vcs-browser">https://github.com/Sqrilizz/VelGrinor</url>
+  <categories>
+    <category>Game</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>minecraft</keyword>
+    <keyword>launcher</keyword>
+    <keyword>modrinth</keyword>
+    <keyword>curseforge</keyword>
+    <keyword>fabric</keyword>
+    <keyword>forge</keyword>
+  </keywords>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">moderate</content_attribute>
+  </content_rating>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Sqrilizz/VelGrinor/master/screenshot.webp</image>
+      <caption>Profile overview with installed mods</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Sqrilizz/VelGrinor/master/screenshot.webp</image>
+      <caption>Mod browser showing popular Modrinth mods</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Sqrilizz/VelGrinor/master/screenshot.webp</image>
+      <caption>Settings page with general options</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.1.26" date="2026-08-13">
+      <description>
+        <p>Add reliable downloads, dependency resolution, diagnostics, snapshots, crash analysis, and session management</p>
+      </description>
+    </release>
+    <release version="0.1.25" date="2026-02-09">
+      <description>
+        <p>Add account export/import for portable account transfer</p>
+      </description>
+    </release>
+    <release version="0.1.24" date="2026-01-29">
+      <description>
+        <p>Fix Flatpak build with correct binary name for Tauri v2</p>
+      </description>
+    </release>
+    <release version="0.1.23" date="2026-01-29">
+      <description>
+        <p>Switch to GNOME Platform 48 for WebKitGTK support</p>
+      </description>
+    </release>
+    <release version="0.1.15" date="2026-01-15">
+      <description>
+        <p>Fix mod modal visibility and improve UI</p>
+      </description>
+    </release>
+    <release version="0.1.14" date="2026-01-14">
+      <description>
+        <p>Fix AppImage Wayland fallback</p>
+      </description>
+    </release>
+    <release version="0.1.12" date="2026-01-12">
+      <description>
+        <p>Add automatic Java download from Adoptium</p>
+      </description>
+    </release>
+    <release version="0.1.9" date="2025-01-03">
+      <description>
+        <p>Add Flathub packaging with screenshots and demo video</p>
+      </description>
+    </release>
+  </releases>
+</component>

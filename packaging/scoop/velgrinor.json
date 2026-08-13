@@ -1,0 +1,15 @@
+{
+    "version": "0.1.26",
+    "description": "A minimal, content-addressed Minecraft launcher (CLI)",
+    "homepage": "https://github.com/Sqrilizz/VelGrinor",
+    "license": "MIT",
+    "url": "https://github.com/Sqrilizz/VelGrinor/releases/download/v0.1.26/velgrinor-cli-windows-x64.zip",
+    "hash": "PLACEHOLDER_SHA256",
+    "bin": "velgrinor.exe",
+    "checkver": {
+        "github": "https://github.com/Sqrilizz/VelGrinor"
+    },
+    "autoupdate": {
+        "url": "https://github.com/Sqrilizz/VelGrinor/releases/download/v$version/velgrinor-cli-windows-x64.zip"
+    }
+}

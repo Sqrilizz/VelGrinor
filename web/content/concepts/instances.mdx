@@ -1,0 +1,83 @@
+---
+title: Instances
+description: How VelGrinor materializes game directories
+---
+
+# Instances
+
+An instance is a materialized game directory, ready to launch Minecraft.
+
+## Location
+
+```
+~/.velgrinor/instances/<profile-id>/
+├── mods/               # Materialized mod files
+│   ├── sodium.jar
+│   └── lithium.jar
+├── resourcepacks/      # Materialized resource packs
+├── shaderpacks/        # Materialized shader packs
+├── config/             # Copied from overrides
+├── saves/              # World data (created by Minecraft)
+└── options.txt         # Minecraft settings
+```
+
+## Materialization
+
+When you launch a profile, VelGrinor:
+
+1. **Creates** the instance directory if needed
+2. **Hard-links** enabled content from the store, with a copy fallback
+3. **Copies** override files from the profile
+4. **Preserves** existing saves and configs
+
+### Materialized Content
+
+Content files use filesystem hard links when possible and regular copies otherwise. This avoids unsafe symlinks while retaining deduplication on supported filesystems. Legacy symlinks are migrated automatically before launch.
+
+### Overrides
+
+Files in `~/.velgrinor/profiles/<id>/overrides/` are copied into the instance. This is where you put:
+- Custom config files
+- Profile-specific settings
+- Any files not in the content store
+
+## Instance Lifecycle
+
+### Fresh Launch
+
+On first launch, VelGrinor creates the instance from scratch.
+
+### Subsequent Launches
+
+VelGrinor updates materialized files to match the current profile state:
+- New content is materialized
+- Removed content is removed from the generated content directories
+- Disabled content is excluded
+
+### Saves and Configs
+
+World saves and configs created by Minecraft are preserved between launches. They live in the instance directory and aren't affected by profile changes.
+
+## Instance Directory Structure
+
+```
+instances/<profile>/
+├── mods/                 # Materialized mod JARs
+├── resourcepacks/        # Materialized resource packs
+├── shaderpacks/          # Materialized shader packs
+├── config/               # Mod configs (from Minecraft)
+├── saves/                # World saves
+├── logs/                 # Minecraft logs
+├── crash-reports/        # Crash reports
+├── screenshots/          # Screenshots
+└── options.txt           # Minecraft options
+```
+
+## Why Instances?
+
+Separating instances from profiles provides:
+
+1. **Clean slate**: Profile changes don't affect running games
+2. **Rollback**: Reset to profile state anytime
+3. **Portability**: Profiles are portable; instances are local
+4. **Inspection**: Easy to see exactly what's running

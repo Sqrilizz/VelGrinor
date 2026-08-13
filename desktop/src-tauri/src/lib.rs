@@ -1,0 +1,181 @@
+mod commands;
+mod discord_rpc;
+
+#[cfg(target_os = "linux")]
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let discord_rpc = discord_rpc::DiscordRpc::default();
+    let paths = velgrinor::paths::Paths::new().expect("failed to resolve VelGrinor data directory");
+    let data_dir = paths
+        .config
+        .parent()
+        .expect("VelGrinor config path has no parent");
+    let config = velgrinor::config::load_config(&paths).unwrap_or_default();
+    let launch_manager = velgrinor::session::LaunchManager::new(data_dir)
+        .expect("failed to initialize launch manager");
+    let download_manager = velgrinor::download::DownloadManager::new(
+        data_dir.join("downloads.json"),
+        config.download_concurrency,
+    )
+    .expect("failed to initialize download manager");
+    tauri::Builder::default()
+        .manage(discord_rpc.clone())
+        .manage(launch_manager)
+        .manage(download_manager)
+        .setup(move |app| {
+            #[cfg(desktop)]
+            let _ = app
+                .handle()
+                .plugin(tauri_plugin_updater::Builder::new().build());
+
+            #[cfg(target_os = "linux")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    commands::set_custom_chrome_enabled(window.set_decorations(false).is_ok());
+                }
+            }
+
+            if let Ok(config) = velgrinor::config::load_config(&velgrinor::paths::Paths::new()?) {
+                discord_rpc.configure(config.discord_rpc_enabled, config.discord_app_id);
+            }
+
+            Ok(())
+        })
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
+        .invoke_handler(tauri::generate_handler![
+            // Profile commands
+            commands::list_profiles_cmd,
+            commands::load_profile_cmd,
+            commands::create_profile_cmd,
+            commands::clone_profile_cmd,
+            commands::delete_profile_cmd,
+            commands::rename_profile_cmd,
+            commands::update_profile_version_cmd,
+            commands::diff_profiles_cmd,
+            commands::add_mod_cmd,
+            commands::add_resourcepack_cmd,
+            commands::add_shaderpack_cmd,
+            commands::remove_mod_cmd,
+            commands::remove_resourcepack_cmd,
+            commands::remove_shaderpack_cmd,
+            commands::prepare_profile_cmd,
+            commands::repair_profile_cmd,
+            commands::export_profile_mrpack_cmd,
+            commands::backup_profile_cmd,
+            commands::launch_profile_cmd,
+            commands::instance_path_cmd,
+            commands::get_active_session_cmd,
+            commands::list_session_records_cmd,
+            commands::stop_session_cmd,
+            commands::diagnose_profile_cmd,
+            commands::apply_diagnostic_fix_cmd,
+            commands::create_snapshot_cmd,
+            commands::list_snapshots_cmd,
+            commands::rollback_snapshot_cmd,
+            commands::analyze_last_crash_cmd,
+            commands::disable_suspected_mod_cmd,
+            commands::list_downloads_cmd,
+            commands::pause_download_cmd,
+            commands::resume_download_cmd,
+            commands::cancel_download_cmd,
+            commands::retry_download_cmd,
+            // Account commands
+            commands::list_accounts_cmd,
+            commands::add_offline_account_cmd,
+            commands::microsoft_browser_login_cmd,
+            commands::set_active_account_cmd,
+            commands::remove_account_cmd,
+            commands::refresh_account_session_cmd,
+            commands::request_device_code_cmd,
+            commands::finish_device_code_flow_cmd,
+            // Account skin/cape commands
+            commands::get_account_info_cmd,
+            commands::upload_skin_cmd,
+            commands::set_skin_url_cmd,
+            commands::reset_skin_cmd,
+            commands::apply_library_skin_cmd,
+            commands::set_cape_cmd,
+            commands::hide_cape_cmd,
+            // Config commands
+            commands::get_config_cmd,
+            commands::save_config_cmd,
+            // Template commands
+            commands::list_templates_cmd,
+            commands::load_template_cmd,
+            commands::create_profile_from_template_cmd,
+            // Store commands
+            commands::store_search_cmd,
+            commands::store_get_project_cmd,
+            commands::store_get_project_icons_cmd,
+            commands::store_get_versions_cmd,
+            commands::store_install_plan_cmd,
+            commands::store_install_cmd,
+            // Logs commands
+            commands::list_log_files_cmd,
+            commands::read_logs_cmd,
+            commands::list_crash_reports_cmd,
+            commands::read_crash_report_cmd,
+            commands::start_log_watch,
+            // Version fetching commands
+            commands::fetch_minecraft_versions_cmd,
+            commands::fetch_fabric_versions_cmd,
+            commands::fetch_quilt_versions_cmd,
+            commands::fetch_neoforge_versions_cmd,
+            commands::fetch_forge_versions_cmd,
+            commands::fetch_loader_versions_cmd,
+            // Java detection commands
+            commands::detect_java_installations_cmd,
+            commands::validate_java_path_cmd,
+            commands::get_required_java_version_cmd,
+            commands::check_java_compatibility_cmd,
+            // Java download commands
+            commands::fetch_adoptium_release_cmd,
+            commands::download_java_cmd,
+            commands::find_compatible_java_cmd,
+            commands::get_managed_java_cmd,
+            commands::list_managed_runtimes_cmd,
+            // Library commands
+            commands::library_list_items_cmd,
+            commands::library_get_item_cmd,
+            commands::library_get_item_by_hash_cmd,
+            commands::library_add_item_cmd,
+            commands::library_update_item_cmd,
+            commands::library_delete_item_cmd,
+            commands::library_get_item_path_cmd,
+            commands::library_import_file_cmd,
+            commands::library_import_folder_cmd,
+            commands::library_get_stats_cmd,
+            commands::library_sync_cmd,
+            commands::library_enrich_from_profiles_cmd,
+            commands::library_list_tags_cmd,
+            commands::library_create_tag_cmd,
+            commands::library_delete_tag_cmd,
+            commands::library_set_item_tags_cmd,
+            commands::library_add_to_profile_cmd,
+            // Settings and storage commands
+            commands::get_data_path_cmd,
+            commands::get_storage_stats_cmd,
+            commands::get_unused_items_cmd,
+            commands::purge_unused_items_cmd,
+            commands::get_auto_update_enabled_cmd,
+            commands::set_auto_update_enabled_cmd,
+            commands::custom_chrome_enabled_cmd,
+            commands::set_discord_rpc_enabled_cmd,
+            commands::update_discord_rpc_cmd,
+            // Update checking commands
+            commands::check_all_updates_cmd,
+            commands::check_profile_updates_cmd,
+            commands::apply_content_update_cmd,
+            commands::set_content_pinned_cmd,
+            commands::set_content_enabled_cmd,
+            // Profile organization commands
+            commands::load_profile_organization_cmd,
+            commands::save_profile_organization_cmd
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

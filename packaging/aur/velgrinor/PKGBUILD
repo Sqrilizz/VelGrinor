@@ -1,0 +1,15 @@
+# Maintainer: Sqrilizz <Sqrilizz@users.noreply.github.com>
+pkgname=velgrinor
+pkgver=0.1.26
+pkgrel=1
+pkgdesc="A minimal, content-addressed Minecraft launcher (CLI)"
+arch=('x86_64')
+url="https://github.com/Sqrilizz/VelGrinor"
+license=('MIT')
+depends=('gcc-libs')
+source=("https://github.com/Sqrilizz/VelGrinor/releases/download/v${pkgver}/velgrinor-cli-linux-x64.tar.gz")
+sha256sums=('PLACEHOLDER_SHA256')
+
+package() {
+    install -Dm755 velgrinor "${pkgdir}/usr/bin/velgrinor"
+}

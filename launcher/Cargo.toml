@@ -1,0 +1,32 @@
+[package]
+name = "velgrinor"
+version = "0.1.26"
+edition = "2024"
+description = "VelGrinor, a content-addressed Minecraft launcher"
+license = "MIT"
+keywords = ["minecraft", "launcher", "gaming", "modrinth", "curseforge"]
+categories = ["command-line-utilities", "games"]
+readme = "../README.md"
+
+[dependencies]
+anyhow = "1.0.100"
+base64 = "0.22"
+atty = "0.2.14"
+clap = { version = "4.5.53", features = ["derive"] }
+dirs = "6.0.0"
+dotenvy = "0.15.7"
+hex = "0.4.3"
+getrandom = "0.3"
+keyring = "2.3.3"
+md5 = "0.7.0"
+p256 = { version = "0.13", features = ["ecdsa"] }
+reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+semver = "1.0.27"
+sha1 = "0.10.6"
+sha2 = "0.10.9"
+shell-words = "1.1.1"
+urlencoding = "2.1.3"
+zip = "7.0.0"
+rusqlite = { version = "0.31", features = ["bundled"] }

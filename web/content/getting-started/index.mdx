@@ -1,0 +1,182 @@
+---
+title: Download & Install
+description: How to download and install VelGrinor
+---
+
+# Download & Install
+
+VelGrinor is available as both a **Desktop App** (graphical launcher) and a **CLI** (command-line tool). They share the same data directory, so profiles and accounts work with both.
+
+## Desktop App
+
+### macOS
+
+#### Homebrew (Recommended)
+
+```bash
+brew tap Sqrilizz/velgrinor
+brew install velgrinor-launcher
+```
+
+#### Manual Download
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/Sqrilizz/VelGrinor/releases/latest)
+   - Apple Silicon: `velgrinor-launcher-macos-arm64.dmg`
+   - Intel: `velgrinor-launcher-macos-x64.dmg`
+2. Open the DMG and drag VelGrinor to Applications
+3. Launch from Applications
+
+> **Note**: On first launch, macOS may show a security warning. Right-click the app and select "Open" to bypass Gatekeeper.
+
+### Windows
+
+#### Manual Download
+
+1. Download from [GitHub Releases](https://github.com/Sqrilizz/VelGrinor/releases/latest):
+   - Installer: `velgrinor-launcher-windows-x64.msi`
+   - Setup: `velgrinor-launcher-windows-x64-setup.exe`
+2. Run the installer
+3. Launch from Start Menu
+
+### Linux
+
+#### AUR (Arch Linux)
+
+```bash
+# Using yay
+yay -S velgrinor-launcher-bin
+
+# Or using paru
+paru -S velgrinor-launcher-bin
+```
+
+#### Manual Download
+
+Download from [GitHub Releases](https://github.com/Sqrilizz/VelGrinor/releases/latest):
+
+**AppImage** (all distros):
+```bash
+chmod +x velgrinor-launcher-linux-x64.AppImage
+./velgrinor-launcher-linux-x64.AppImage
+```
+
+**Debian/Ubuntu** (.deb):
+```bash
+sudo dpkg -i velgrinor-launcher-linux-x64.deb
+```
+
+---
+
+## CLI
+
+The CLI is a separate tool for scripting and automation.
+
+### macOS
+
+#### Homebrew (Recommended)
+
+```bash
+brew tap Sqrilizz/velgrinor
+brew install velgrinor
+```
+
+#### Manual Download
+
+```bash
+# Apple Silicon
+curl -LO https://github.com/Sqrilizz/VelGrinor/releases/latest/download/velgrinor-cli-macos-arm64.tar.gz
+tar -xzf velgrinor-cli-macos-arm64.tar.gz
+sudo mv velgrinor /usr/local/bin/
+
+# Intel
+curl -LO https://github.com/Sqrilizz/VelGrinor/releases/latest/download/velgrinor-cli-macos-x64.tar.gz
+tar -xzf velgrinor-cli-macos-x64.tar.gz
+sudo mv velgrinor /usr/local/bin/
+```
+
+### Windows
+
+#### Scoop (Recommended)
+
+```powershell
+scoop bucket add velgrinor https://github.com/Sqrilizz/scoop-velgrinor
+scoop install velgrinor
+```
+
+#### Manual Download
+
+1. Download `velgrinor-cli-windows-x64.zip` from [GitHub Releases](https://github.com/Sqrilizz/VelGrinor/releases/latest)
+2. Extract and add `velgrinor.exe` to your PATH
+
+### Linux
+
+#### Homebrew
+
+```bash
+brew tap Sqrilizz/velgrinor
+brew install velgrinor
+```
+
+#### AUR (Arch Linux)
+
+```bash
+yay -S velgrinor
+```
+
+#### Manual Download
+
+```bash
+curl -LO https://github.com/Sqrilizz/VelGrinor/releases/latest/download/velgrinor-cli-linux-x64.tar.gz
+tar -xzf velgrinor-cli-linux-x64.tar.gz
+sudo mv velgrinor /usr/local/bin/
+```
+
+---
+
+## Distribution Channels Summary
+
+| Channel | OS | Desktop | CLI | Install Command |
+|---------|-----|---------|-----|-----------------|
+| **Homebrew** | macOS, Linux | ✅ (macOS) | ✅ | `brew tap Sqrilizz/velgrinor && brew install velgrinor` |
+| **Scoop** | Windows | ❌ | ✅ | `scoop install velgrinor` |
+| **AUR** | Arch Linux | ✅ | ✅ | `yay -S velgrinor-launcher-bin` / `yay -S velgrinor` |
+| **GitHub Releases** | All | ✅ | ✅ | [Download](https://github.com/Sqrilizz/VelGrinor/releases/latest) |
+
+---
+
+## Verifying Downloads
+
+Each release includes SHA-256 checksums in `SHA256SUMS.txt`:
+
+```bash
+# macOS/Linux
+sha256sum -c SHA256SUMS.txt
+
+# Or verify a single file
+sha256sum velgrinor-launcher-*.dmg
+```
+
+---
+
+## Data Location
+
+VelGrinor stores all data in `~/.velgrinor/`. Both the desktop app and CLI use this directory:
+
+```
+~/.velgrinor/
+├── store/          # Content-addressed storage (mods, packs)
+├── profiles/       # Profile manifests
+├── instances/      # Materialized game directories
+├── minecraft/      # Versions, libraries, assets
+├── accounts.json   # Account tokens
+└── config.json     # Launcher settings
+```
+
+---
+
+## Next Steps
+
+- [Create your first profile](/docs/getting-started/first-profile)
+- [Add your Microsoft account](/docs/getting-started/accounts)
+- [Learn about profiles](/docs/concepts/profiles)
+- [CLI Reference](/docs/cli)

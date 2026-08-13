@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=VelGrinor Launcher
+Comment=A minimal, modern Minecraft launcher
+Exec=velgrinor-launcher
+Icon=md.thomas.velgrinor.launcher
+Terminal=false
+Type=Application
+Categories=Game;
+Keywords=minecraft;launcher;modrinth;curseforge;
+StartupWMClass=velgrinor-launcher

@@ -1,0 +1,6 @@
+# VelGrinor - https://sqrilizz.tech
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://sqrilizz.tech/sitemap.xml
