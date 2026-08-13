@@ -1,6 +1,6 @@
 # Maintainer: Sqrilizz <Sqrilizz@users.noreply.github.com>
 pkgname=velgrinor-launcher-bin
-pkgver=0.1.26
+pkgver=0.1.27
 pkgrel=1
 pkgdesc="A minimal, content-addressed Minecraft launcher (Desktop App)"
 arch=('x86_64')

@@ -57,7 +57,7 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.1.26" date="2026-08-13">
+    <release version="0.1.27" date="2026-08-13">
       <description>
         <p>Add reliable downloads, dependency resolution, diagnostics, snapshots, crash analysis, and session management</p>
       </description>

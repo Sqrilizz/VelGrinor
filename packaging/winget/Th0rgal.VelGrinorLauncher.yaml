@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.6.0.schema.json
 PackageIdentifier: Th0rgal.VelGrinorLauncher
-PackageVersion: 0.1.26
+PackageVersion: 0.1.27
 PackageLocale: en-US
 Publisher: Sqrilizz
 PublisherUrl: https://github.com/Sqrilizz
@@ -26,7 +26,7 @@ Tags:
 Installers:
   - Architecture: x64
     InstallerType: msi
-    InstallerUrl: https://github.com/Sqrilizz/VelGrinor/releases/download/v0.1.26/velgrinor-launcher-windows-x64.msi
+    InstallerUrl: https://github.com/Sqrilizz/VelGrinor/releases/download/v0.1.27/velgrinor-launcher-windows-x64.msi
     InstallerSha256: PLACEHOLDER_SHA256
 ManifestType: singleton
 ManifestVersion: 1.6.0

@@ -1,6 +1,6 @@
 # Maintainer: Sqrilizz <Sqrilizz@users.noreply.github.com>
 pkgname=velgrinor
-pkgver=0.1.26
+pkgver=0.1.27
 pkgrel=1
 pkgdesc="A minimal, content-addressed Minecraft launcher (CLI)"
 arch=('x86_64')
