@@ -299,10 +299,10 @@ export default function HomePage() {
             <p className="text-xs text-[rgb(var(--foreground-muted))]">
               © {new Date().getFullYear()}{" "}
               <Link
-                href="https://thomas.md"
+                href="https://sqrilizz.tech"
                 className="text-[rgb(var(--foreground-tertiary))] hover:text-[rgb(var(--foreground-secondary))] transition-colors duration-150"
               >
-                Thomas Marchand
+                Sqrilizz
               </Link>
             </p>
             <Link

@@ -36,8 +36,8 @@ export const metadata: Metadata = {
     "curseforge",
     "open source",
   ],
-  authors: [{ name: "Thomas Marchand", url: "https://thomas.md" }],
-  creator: "Thomas Marchand",
+  authors: [{ name: "Sqrilizz", url: "https://sqrilizz.tech" }],
+  creator: "Sqrilizz",
   publisher: "VelGrinor",
   robots: {
     index: true,
@@ -48,7 +48,6 @@ export const metadata: Metadata = {
     title: "VelGrinor",
     description:
       "Open-source Minecraft launcher with declarative profiles, content-addressed storage, and Modrinth/CurseForge integration.",
-    creator: "@music_music_yo",
   },
   openGraph: {
     type: "website",

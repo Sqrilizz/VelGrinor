@@ -15,8 +15,8 @@ export function JsonLd() {
     },
     author: {
       "@type": "Person",
-      name: "Thomas Marchand",
-      url: "https://thomas.md",
+      name: "Sqrilizz",
+      url: "https://sqrilizz.tech",
     },
     downloadUrl: "https://sqrilizz.tech/docs/getting-started",
     keywords: [

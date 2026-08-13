@@ -1,7 +1,6 @@
 {
   "build": {
-    "beforeBuildCommand": "bash ../scripts/compile-liquid-glass-icon.sh && npm run build",
-    "beforeBundleCommand": "bash ../scripts/compile-liquid-glass-icon.sh"
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
@@ -20,10 +19,5 @@
         }
       }
     ]
-  },
-  "bundle": {
-    "resources": {
-      "icons/Assets.car": "Assets.car"
-    }
   }
 }
