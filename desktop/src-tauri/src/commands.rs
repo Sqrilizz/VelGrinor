@@ -40,6 +40,10 @@ use velgrinor::modpack::{
     ProfileRepairReport,
 };
 use velgrinor::modrinth::ModrinthClient;
+use velgrinor::ogulniega::{
+    extract_default_profile, fetch_catalog, fetch_version_manifest, OgulniegaPack,
+    DEFAULT_PROFILE_URL,
+};
 use velgrinor::ops::{
     ensure_fresh_account, finish_device_code_flow, finish_microsoft_login_with_minecraft,
     parse_loader, resolve_input, resolve_launch_account,
@@ -152,6 +156,11 @@ pub struct StoreInstallInput {
     pub platform: String,
     pub version_id: Option<String>,
     pub content_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct OgulniegaInstallInput {
+    pub pack_name: String,
 }
 
 fn load_paths() -> Result<Paths, String> {
@@ -1718,6 +1727,242 @@ pub async fn store_install_cmd(
     })
     .await
     .map_err(|e| format!("store install task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn ogulniega_list_cmd() -> Result<Vec<OgulniegaPack>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        fetch_catalog()
+            .map(|catalog| catalog.versions.into_iter().rev().collect())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Ogulniega catalog task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn ogulniega_install_cmd(
+    app: AppHandle,
+    download_manager: State<'_, DownloadManager>,
+    input: OgulniegaInstallInput,
+) -> Result<Profile, String> {
+    let manager = download_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        install_ogulniega(&app, &manager, &input.pack_name)
+    })
+    .await
+    .map_err(|error| format!("Ogulniega install task failed: {error}"))?
+}
+
+fn install_ogulniega(
+    app: &AppHandle,
+    manager: &DownloadManager,
+    pack_name: &str,
+) -> Result<Profile, String> {
+    emit_store_progress(app, "resolving", "Loading Ogulniega build", 2, None, None);
+    let paths = load_paths()?;
+    let catalog = fetch_catalog().map_err(|error| error.to_string())?;
+    let pack = catalog
+        .versions
+        .into_iter()
+        .find(|pack| pack.name == pack_name)
+        .ok_or_else(|| "Ogulniega build no longer exists".to_string())?;
+    let manifest = fetch_version_manifest(pack_name).map_err(|error| error.to_string())?;
+    let profile_id = available_profile_id(&paths, &format!("ogulniega-{}", pack.name));
+    let group = format!("ogulniega:{profile_id}");
+    let mut downloads = Vec::with_capacity(manifest.mods.len() + 1);
+    let profile_archive = paths
+        .cache_downloads
+        .join(format!("ogulniega-{profile_id}-profile.zip"));
+    let mut profile_request = DownloadRequest::new(DEFAULT_PROFILE_URL, &profile_archive);
+    profile_request.group = Some(group.clone());
+    profile_request.label = Some("Ogulniega profile settings".to_string());
+    downloads.push(profile_request);
+    let mut mod_destinations = Vec::with_capacity(manifest.mods.len());
+    for (index, item) in manifest.mods.iter().enumerate() {
+        let destination = paths.cache_downloads.join(format!(
+            "ogulniega-{profile_id}-{index}-{}",
+            velgrinor::util::sanitize_filename(&item.name)
+        ));
+        let mut request = DownloadRequest::new(&item.url, &destination);
+        request.sha512 = Some(item.sha512.clone());
+        request.group = Some(group.clone());
+        request.label = Some(item.name.clone());
+        downloads.push(request);
+        mod_destinations.push((item, destination));
+    }
+    let progress_app = app.clone();
+    let progress_manager = manager.clone();
+    let progress_group = group.clone();
+    manager
+        .run_requests(downloads, move |snapshot| {
+            let _ = progress_app.emit("download-progress", snapshot.clone());
+            let aggregate = progress_manager.group_snapshot(Some(&progress_group));
+            let percent = aggregate
+                .bytes_total
+                .filter(|total| *total > 0)
+                .map(|total| ((aggregate.bytes_downloaded.saturating_mul(75) / total) + 10) as u8)
+                .unwrap_or_else(|| {
+                    ((aggregate.files_completed.saturating_mul(75) / aggregate.files_total.max(1))
+                        + 10) as u8
+                })
+                .min(85);
+            emit_store_progress(
+                &progress_app,
+                "downloading",
+                format!(
+                    "Downloading files {}/{}: {}",
+                    aggregate.files_completed,
+                    aggregate.files_total,
+                    snapshot.request.label.as_deref().unwrap_or("file")
+                ),
+                percent,
+                Some(aggregate.bytes_downloaded),
+                aggregate.bytes_total,
+            );
+        })
+        .map_err(|error| format!("failed to download Ogulniega build: {error}"))?;
+
+    emit_store_progress(app, "installing", "Saving Ogulniega mods", 87, None, None);
+    let mut refs = Vec::with_capacity(mod_destinations.len());
+    let mut library_mods = Vec::with_capacity(mod_destinations.len());
+    for (item, destination) in mod_destinations {
+        let stored = store_content(
+            &paths,
+            ContentKind::Mod,
+            &destination,
+            Some(item.url.clone()),
+            Some(item.name.clone()),
+        )
+        .map_err(|error| format!("failed to store {}: {error}", item.name))?;
+        refs.push(ContentRef {
+            name: item.id.clone(),
+            hash: stored.hash.clone(),
+            version: None,
+            source: Some(item.url.clone()),
+            file_name: Some(stored.file_name.clone()),
+            platform: Some("ogulniega".to_string()),
+            project_id: Some(item.id.clone()),
+            version_id: Some(pack.name.clone()),
+            enabled: true,
+            pinned: false,
+        });
+        library_mods.push((item.clone(), stored));
+    }
+
+    let runtime_args = pack
+        .jvm_args
+        .iter()
+        .filter(|argument| !argument.starts_with("-Dfabric.addMods="))
+        .cloned()
+        .collect();
+    let loader_version = pack.loader_version().map_err(|error| error.to_string())?;
+    let mut profile = create_profile(
+        &paths,
+        &profile_id,
+        &pack.minecraft_version,
+        Some(Loader {
+            loader_type: "fabric".to_string(),
+            version: loader_version.to_string(),
+        }),
+        Runtime {
+            java: None,
+            memory: None,
+            args: runtime_args,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+    let finish = (|| -> Result<(), String> {
+        extract_default_profile(&profile_archive, &paths.profile_overrides(&profile_id))
+            .map_err(|error| format!("failed to apply Ogulniega settings: {error}"))?;
+        profile.mods = refs;
+        save_profile(&paths, &profile).map_err(|error| error.to_string())?;
+        let manifest_path = paths
+            .cache_downloads
+            .join(format!("ogulniega-{profile_id}-manifest.json"));
+        std::fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.to_string())?;
+        let stored_pack = store_content(
+            &paths,
+            ContentKind::ModPack,
+            &manifest_path,
+            Some(format!(
+                "https://ogulniega.com/files/client_versions/{}.json",
+                pack.name
+            )),
+            Some(format!("{}.ogulniega.json", pack.name)),
+        )
+        .map_err(|error| error.to_string())?;
+        if let Ok(library) = Library::from_paths(&paths) {
+            for (item, stored) in library_mods {
+                if let Ok(entry) = library.add_item(&LibraryItemInput {
+                    hash: stored.hash,
+                    content_type: Some("mod".to_string()),
+                    name: Some(item.id),
+                    file_name: Some(stored.file_name),
+                    file_size: None,
+                    source_url: Some(item.url),
+                    source_platform: Some("ogulniega".to_string()),
+                    source_project_id: None,
+                    source_version: Some(pack.name.clone()),
+                    notes: None,
+                }) {
+                    let _ = library.link_item_to_profile(
+                        entry.id,
+                        &profile_id,
+                        LibraryContentType::Mod,
+                    );
+                }
+            }
+            if let Ok(entry) = library.add_item(&LibraryItemInput {
+                hash: stored_pack.hash,
+                content_type: Some("modpack".to_string()),
+                name: Some(format!("Ogulniega {}", pack.name)),
+                file_name: Some(stored_pack.file_name),
+                file_size: std::fs::metadata(&manifest_path)
+                    .ok()
+                    .map(|value| value.len() as i64),
+                source_url: Some(format!(
+                    "https://ogulniega.com/files/client_versions/{}.json",
+                    pack.name
+                )),
+                source_platform: Some("ogulniega".to_string()),
+                source_project_id: Some(pack.name.clone()),
+                source_version: Some(pack.minecraft_version.clone()),
+                notes: Some(format!("{} mods", manifest.mods.len())),
+            }) {
+                let _ = library.link_item_to_profile(
+                    entry.id,
+                    &profile_id,
+                    LibraryContentType::ModPack,
+                );
+            }
+        }
+        Ok(())
+    })();
+    if let Err(error) = finish {
+        let _ = delete_profile(&paths, &profile_id);
+        return Err(error);
+    }
+    emit_store_progress(app, "done", "Ogulniega build installed", 100, None, None);
+    Ok(profile)
+}
+
+fn available_profile_id(paths: &Paths, requested: &str) -> String {
+    let base = velgrinor::util::sanitize_filename(requested);
+    if !paths.is_profile_present(&base) {
+        return base;
+    }
+    for suffix in 2..10_000 {
+        let candidate = format!("{base}-{suffix}");
+        if !paths.is_profile_present(&candidate) {
+            return candidate;
+        }
+    }
+    format!("{base}-{}", std::process::id())
 }
 
 fn emit_store_progress(

@@ -60,6 +60,15 @@ const installTauriMock = async (page: Page, scenario: Scenario) => {
       if (command === "get_active_session_cmd") return scenarioName === "session" ? session : null;
       if (command === "list_downloads_cmd") return scenarioName === "downloads" ? [download] : [];
       if (command === "store_search_cmd" || command === "store_get_versions_cmd") return [];
+      if (command === "ogulniega_list_cmd") return [{
+        name: "1.21.1-sodium",
+        minecraft_version: "1.21.1",
+        fabric_version: "0.19.3",
+        loader_name: "fabric-1.21.1-0.17.3",
+        java_name: "jdk-21",
+        jvm_args: ["-Dfabric.addMods=mods/1.21.1-sodium"],
+      }];
+      if (command === "ogulniega_install_cmd") return { ...profile, id: "ogulniega-1.21.1-sodium" };
       if (command === "get_auto_update_enabled_cmd") return true;
       if (command === "get_storage_stats_cmd") return { total_bytes: 0, mods_bytes: 0, resourcepacks_bytes: 0, shaderpacks_bytes: 0, skins_bytes: 0, minecraft_bytes: 0, database_bytes: 0 };
       if (command === "detect_java_installations_cmd") return [];
@@ -117,6 +126,11 @@ const openApp = async (page: Page, scenario: Scenario) => {
     contentType: "image/svg+xml",
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"/>',
   }));
+  await page.route("https://ogulniega.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/svg+xml",
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"/>',
+  }));
   await installTauriMock(page, scenario);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Test Profile" })).toBeVisible();
@@ -156,6 +170,18 @@ test("download tray exposes progress and controls", async ({ page }) => {
   await expect(tray).toContainText("1.0MB/s");
   await tray.getByRole("button", { name: "Pause" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __mockCalls: Array<{ command: string }> }).__mockCalls.some((call) => call.command === "pause_download_cmd"))).toBe(true);
+  await expectNoBrowserIssues(page, issues);
+});
+
+test("Ogulniega builds are offered as a separate install source", async ({ page }) => {
+  const issues = await openApp(page, "base");
+  await page.getByRole("button", { name: "Store", exact: true }).click();
+  await page.getByRole("button", { name: "Modpacks", exact: true }).click();
+  await page.locator("select").selectOption("ogulniega");
+  await expect(page.getByText("Ogulniega 1.21.1-sodium", { exact: true })).toBeVisible();
+  await expect(page.getByText("Minecraft 1.21.1 · Fabric 0.17.3 · Sodium", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Install as a new profile" }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __mockCalls: Array<{ command: string; args: Record<string, unknown> }> }).__mockCalls.some((call) => call.command === "ogulniega_install_cmd" && (call.args.input as { pack_name: string }).pack_name === "1.21.1-sodium"))).toBe(true);
   await expectNoBrowserIssues(page, issues);
 });
 

@@ -15,6 +15,7 @@ pub mod logs;
 pub mod minecraft;
 pub mod modpack;
 pub mod modrinth;
+pub mod ogulniega;
 pub mod ops;
 pub mod paths;
 pub mod profile;

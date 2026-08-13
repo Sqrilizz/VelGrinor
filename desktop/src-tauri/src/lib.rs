@@ -116,6 +116,8 @@ pub fn run() {
             commands::store_get_versions_cmd,
             commands::store_install_plan_cmd,
             commands::store_install_cmd,
+            commands::ogulniega_list_cmd,
+            commands::ogulniega_install_cmd,
             // Logs commands
             commands::list_log_files_cmd,
             commands::read_logs_cmd,

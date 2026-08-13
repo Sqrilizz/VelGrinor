@@ -27,7 +27,16 @@ interface StoreSearchInput {
   platform?: string | null;
 }
 
-type StorePlatform = "all" | "modrinth" | "curseforge";
+type StorePlatform = "all" | "modrinth" | "curseforge" | "ogulniega";
+
+type OgulniegaPack = {
+  name: string;
+  minecraft_version: string;
+  fabric_version: string;
+  loader_name: string;
+  java_name?: string | null;
+  jvm_args: string[];
+};
 
 type StoreInstallProgress = {
   stage: string;
@@ -80,6 +89,8 @@ export function StoreView() {
   const [installing, setInstalling] = useState<string | null>(null);
   const [quickInstalling, setQuickInstalling] = useState<string | null>(null);
   const [installProgress, setInstallProgress] = useState<StoreInstallProgress | null>(null);
+  const [ogulniegaPacks, setOgulniegaPacks] = useState<OgulniegaPack[]>([]);
+  const [ogulniegaLoading, setOgulniegaLoading] = useState(false);
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
@@ -122,9 +133,21 @@ export function StoreView() {
     loadPopular();
   }, [category]);
 
+  useEffect(() => {
+    if (category !== "modpacks" || platform !== "ogulniega" || ogulniegaPacks.length > 0 || ogulniegaLoading) return;
+    setOgulniegaLoading(true);
+    void invoke<OgulniegaPack[]>("ogulniega_list_cmd")
+      .then(setOgulniegaPacks)
+      .catch((error) => notify(t("Failed to load Ogulniega builds"), String(error)))
+      .finally(() => setOgulniegaLoading(false));
+  }, [category, platform, ogulniegaPacks.length, ogulniegaLoading, notify]);
+
   // Results to display: search results if searching, otherwise cached popular
-  const displayResults = searchResults ?? popularCache[category];
+  const displayResults = platform === "ogulniega" ? [] : searchResults ?? popularCache[category];
   const isShowingPopular = searchResults === null && displayResults.length > 0;
+  const visibleOgulniegaPacks = ogulniegaPacks.filter((pack) =>
+    `${pack.name} ${pack.minecraft_version}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
 
   // Check if a project is already installed in the current profile
   const isProjectInstalled = useCallback((project: StoreProject): boolean => {
@@ -154,6 +177,7 @@ export function StoreView() {
   }, [profile, category]);
 
   const handleSearch = useCallback(async () => {
+    if (category === "modpacks" && platform === "ogulniega") return;
     if (!query.trim()) {
       setSearchResults(null);
       return;
@@ -181,6 +205,13 @@ export function StoreView() {
       setLoading(false);
     }
   }, [query, category, platform, profile, notify]);
+
+  const handlePlatformChange = useCallback((nextPlatform: StorePlatform) => {
+    setPlatform(nextPlatform);
+    setSearchResults(null);
+    setSelectedProject(null);
+    setVersions([]);
+  }, []);
 
   const handleCategoryChange = useCallback((newCategory: StoreCategory) => {
     setCategory(newCategory);
@@ -301,6 +332,25 @@ export function StoreView() {
     }
   }, [selectedProfileId, profile, category, loadProfile, loadProfiles, setSelectedProfileId, notify]);
 
+  const handleOgulniegaInstall = useCallback(async (pack: OgulniegaPack) => {
+    const key = `ogulniega-${pack.name}`;
+    setQuickInstalling(key);
+    try {
+      const installedProfile = await invoke<{ id: string }>("ogulniega_install_cmd", {
+        input: { pack_name: pack.name },
+      });
+      await loadProfiles();
+      setSelectedProfileId(installedProfile.id);
+      await loadProfile(installedProfile.id);
+      notify(t("Modpack installed"), `${pack.name} created as ${installedProfile.id}`);
+    } catch (error) {
+      setInstallProgress({ stage: "error", message: String(error), progress: 0 });
+      notify(t("Install failed"), String(error));
+    } finally {
+      setQuickInstalling(null);
+    }
+  }, [loadProfile, loadProfiles, setSelectedProfileId, notify]);
+
   return (
     <div className="view-transition">
       {installProgress && (
@@ -361,18 +411,18 @@ export function StoreView() {
         <select
           className="select"
           value={platform}
-          onChange={(e) => setPlatform(e.target.value as StorePlatform)}
-          disabled={category === "modpacks"}
-          style={{ width: 130 }}
+          onChange={(e) => handlePlatformChange(e.target.value as StorePlatform)}
+          style={{ width: 150 }}
         >
-          <option value="all">{t("All platforms")}</option>
+          {category !== "modpacks" && <option value="all">{t("All platforms")}</option>}
           <option value="modrinth">{t("Modrinth")}</option>
-          <option value="curseforge">{t("CurseForge")}</option>
+          {category !== "modpacks" && <option value="curseforge">{t("CurseForge")}</option>}
+          {category === "modpacks" && <option value="ogulniega">Ogulniega</option>}
         </select>
         <button
           className="btn btn-primary"
           onClick={handleSearch}
-          disabled={loading || !query.trim()}
+          disabled={loading || !query.trim() || platform === "ogulniega"}
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -381,7 +431,9 @@ export function StoreView() {
       {/* Version context */}
       {category === "modpacks" ? (
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 20 }}>
-          {isShowingPopular ? t("Popular") : t("Results")} {t("from Modrinth. Installing creates a new profile.")}
+          {platform === "ogulniega"
+            ? t("Official Ogulniega builds. Installing creates a new VelGrinor profile.")
+            : <>{isShowingPopular ? t("Popular") : t("Results")} {t("from Modrinth. Installing creates a new profile.")}</>}
         </p>
       ) : profile && (
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 20 }}>
@@ -408,6 +460,68 @@ export function StoreView() {
       <div style={{ display: "flex", gap: 24 }}>
         {/* Results list */}
         <div style={{ flex: 1, minWidth: 0 }}>
+          {category === "modpacks" && platform === "ogulniega" && ogulniegaLoading && (
+            <p style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("Loading Ogulniega builds...")}</p>
+          )}
+
+          {category === "modpacks" && platform === "ogulniega" && !ogulniegaLoading && visibleOgulniegaPacks.length === 0 && (
+            <div className="empty-state" style={{ padding: 40 }}>
+              <h3>{t("No results")}</h3>
+              <p>{t("Try a different search term or category.")}</p>
+            </div>
+          )}
+
+          {category === "modpacks" && platform === "ogulniega" && visibleOgulniegaPacks.map((pack) => {
+            const key = `ogulniega-${pack.name}`;
+            const variant = pack.name.includes("vulkan") ? "Vulkan" : pack.name.includes("optifine") ? "OptiFine" : "Sodium";
+            const loaderParts = pack.loader_name.split("-");
+            const loaderVersion = loaderParts[loaderParts.length - 1] || pack.fabric_version;
+            return (
+              <div key={pack.name} className="content-item-v2" style={{ alignItems: "flex-start" }}>
+                <div className="content-item-icon" style={{ width: 48, height: 48, alignSelf: "flex-start" }}>
+                  <img
+                    src="https://ogulniega.com/_app/immutable/assets/favicon.BZpNINNp.png"
+                    alt=""
+                    style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover" }}
+                  />
+                </div>
+                <div className="content-item-main">
+                  <div className="content-item-header">
+                    <h5 className="content-item-name">Ogulniega {pack.name}</h5>
+                  </div>
+                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
+                    Minecraft {pack.minecraft_version} · Fabric {loaderVersion} · {variant}
+                  </p>
+                  <div className="content-item-meta" style={{ marginTop: 6 }}>
+                    <button
+                      className="content-meta-platform content-meta-platform-link"
+                      style={{ color: "#00e07c" }}
+                      onClick={() => openUrl("https://ogulniega.com")}
+                      title={t("Open Ogulniega website")}
+                    >
+                      Ogulniega
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="content-item-actions" style={{ opacity: 1, alignSelf: "center" }}>
+                  <button
+                    className="btn-icon btn-install"
+                    onClick={() => handleOgulniegaInstall(pack)}
+                    disabled={quickInstalling === key}
+                    title={t("Install as a new profile")}
+                  >
+                    {quickInstalling === key ? "…" : "+"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
           {displayResults.length === 0 && !loading && searchResults !== null && (
             <div className="empty-state" style={{ padding: 40 }}>
               <h3>{t("No results")}</h3>

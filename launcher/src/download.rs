@@ -5,7 +5,7 @@ use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_RANGE, RANGE};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest as _, Sha1};
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -28,6 +28,8 @@ pub struct DownloadRequest {
     pub sha1: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
     #[serde(default)]
     pub group: Option<String>,
     #[serde(default)]
@@ -49,6 +51,7 @@ impl DownloadRequest {
             expected_size: None,
             sha1: None,
             sha256: None,
+            sha512: None,
             group: None,
             label: None,
         }
@@ -461,8 +464,12 @@ impl DownloadManager {
             let _ = fs::remove_file(part);
             bail!("size mismatch: expected {expected}, got {size}");
         }
-        if let Err(error) = verify_hashes(part, request.sha1.as_deref(), request.sha256.as_deref())
-        {
+        if let Err(error) = verify_hashes(
+            part,
+            request.sha1.as_deref(),
+            request.sha256.as_deref(),
+            request.sha512.as_deref(),
+        ) {
             let _ = fs::remove_file(part);
             return Err(error);
         }
@@ -547,13 +554,19 @@ fn content_range_total(value: Option<&str>) -> Option<u64> {
     value?.split('/').nth(1)?.parse().ok()
 }
 
-fn verify_hashes(path: &Path, sha1: Option<&str>, sha256: Option<&str>) -> Result<()> {
-    if sha1.is_none() && sha256.is_none() {
+fn verify_hashes(
+    path: &Path,
+    sha1: Option<&str>,
+    sha256: Option<&str>,
+    sha512: Option<&str>,
+) -> Result<()> {
+    if sha1.is_none() && sha256.is_none() && sha512.is_none() {
         return Ok(());
     }
     let mut file = fs::File::open(path)?;
     let mut sha1_hasher = Sha1::new();
     let mut sha256_hasher = Sha256::new();
+    let mut sha512_hasher = Sha512::new();
     let mut buffer = [0_u8; 64 * 1024];
     loop {
         let read = file.read(&mut buffer)?;
@@ -562,6 +575,7 @@ fn verify_hashes(path: &Path, sha1: Option<&str>, sha256: Option<&str>) -> Resul
         }
         sha1_hasher.update(&buffer[..read]);
         sha256_hasher.update(&buffer[..read]);
+        sha512_hasher.update(&buffer[..read]);
     }
     if let Some(expected) = sha1
         && hex::encode(sha1_hasher.finalize()) != expected.to_ascii_lowercase()
@@ -572,6 +586,11 @@ fn verify_hashes(path: &Path, sha1: Option<&str>, sha256: Option<&str>) -> Resul
         && hex::encode(sha256_hasher.finalize()) != expected.to_ascii_lowercase()
     {
         bail!("SHA-256 checksum mismatch");
+    }
+    if let Some(expected) = sha512
+        && hex::encode(sha512_hasher.finalize()) != expected.to_ascii_lowercase()
+    {
+        bail!("SHA-512 checksum mismatch");
     }
     Ok(())
 }
@@ -756,7 +775,7 @@ mod tests {
         let root = test_root("hash-unit");
         let file = root.join("file");
         fs::write(&file, b"content").unwrap();
-        assert!(verify_hashes(&file, None, Some("bad")).is_err());
+        assert!(verify_hashes(&file, None, Some("bad"), None).is_err());
         let _ = fs::remove_dir_all(root);
     }
 
