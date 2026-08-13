@@ -114,6 +114,7 @@ impl LaunchManager {
             state.child = Some(child);
         }
         let manager = self.clone();
+        let completed_session = session.clone();
         std::thread::spawn(move || {
             loop {
                 let status = {
@@ -126,9 +127,9 @@ impl LaunchManager {
                 if let Some(status) = status {
                     let ended_at = now_epoch_secs();
                     let record = SessionRecord {
-                        session: session.clone(),
+                        session: completed_session.clone(),
                         ended_at,
-                        duration_seconds: ended_at.saturating_sub(session.started_at),
+                        duration_seconds: ended_at.saturating_sub(completed_session.started_at),
                         exit_code: status.code(),
                         crash_report: None,
                     };
@@ -139,7 +140,7 @@ impl LaunchManager {
                 std::thread::sleep(Duration::from_millis(250));
             }
         });
-        Ok(self.get_active_session().unwrap())
+        Ok(session)
     }
 
     pub fn stop(&self, session_id: &str) -> Result<()> {
